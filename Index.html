@@ -1,1 +1,150 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head> 
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>মাদ্রাসা ম্যানেজমেন্ট সিস্টেম</title>
 
+    <link rel="icon" type="image/png" href="https://lh3.googleusercontent.com/d/1ZgIsgAfGHmoJuK86BmxUQBIz51vAlFxE" />
+    <link href="https://fonts.googleapis.com/css2?family=SolaimanLipi&display=swap" rel="stylesheet" />
+    
+    <style>
+        * { box-sizing: border-box; font-family: 'SolaimanLipi', sans-serif; }
+        html, body { margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; background-color: #0f172a; color: #f8fafc; }
+        
+        .login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #0f172a; display: flex; justify-content: center; align-items: center; z-index: 99999; padding: 20px; }
+        .login-card { background: #1e293b; padding: 40px 30px; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.5); width: 100%; max-width: 450px; text-align: center; border: 1px solid #334155; }
+        .madrasa-logo { width: 90px; height: 90px; margin-bottom: 20px; filter: drop-shadow(0px 4px 8px rgba(0, 0, 0, 0.4)); object-fit: contain; }
+        .login-card h2 { margin: 0 0 8px 0; font-size: 24px; color: #38bdf8; }
+        .login-card p { margin: 0 0 20px 0; color: #94a3b8; font-size: 14px; }
+        .error-msg { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #f87171; padding: 10px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; display: none; text-align: center; }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        .input-group label { display: block; margin-bottom: 6px; font-size: 14px; color: #cbd5e1; }
+        .input-group input { width: 100%; padding: 12px 16px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: #fff; font-size: 16px; outline: none; transition: 0.2s; }
+        .input-group input:focus { border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2); }
+        .login-btn { width: 100%; padding: 14px; background: #0284c7; border: none; border-radius: 8px; color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 10px; }
+        .login-btn:hover { background: #0369a1; }
+        
+        /* 🎯 মেইন ড্যাশবোর্ড উইন্ডো (গুগল স্ক্রিপ্ট লোড করার জন্য) */
+        .main-container { width: 100%; height: 100%; overflow: hidden; display: none; position: relative; }
+        iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; background-color: #0f172a; }
+    </style>
+</head>
+<body>
+
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-card" id="loginCardContainer">
+            <img src="https://lh3.googleusercontent.com/d/1ZgIsgAfGHmoJuK86BmxUQBIz51vAlFxE" alt="Madrasa Logo" class="madrasa-logo" />
+            <h2>লাইসেন্স ভেরিফিকেশন</h2>
+            <p>সফটওয়্যারটি ব্যবহার করতে অনুগ্রহ করে ইউজারনেম এবং পাসওয়ার্ড দিন</p>
+            
+            <div class="error-msg" id="errorBlock"></div>
+            
+            <div class="input-group">
+                <label for="username">ইউজারনেম / ফোন নম্বর</label>
+                <input type="text" id="username" placeholder="যেমন:manikpir" required />
+            </div>
+            
+            <div class="input-group">
+                <label for="licenseKey">পাসওয়ার্ড</label>
+                <input type="password" id="licenseKey" placeholder="যেমন: manikpir@94" required />
+            </div>
+            
+            <button class="login-btn" id="loginBtn" onclick="performSecureLogin()">🔑 যাচাই ও সক্রিয় করুন</button>
+        </div>
+    </div>
+
+    <div class="main-container" id="mainAppContainer">
+        <iframe id="appIframe" src=""></iframe>
+    </div>
+
+    <script>
+        // 🎯 আপনার গুগল অ্যাপস স্ক্রিপ্টের এপিআই ইউআরএল
+        var GOOGLE_SCRIPT_API = "https://script.google.com/macros/s/AKfycbx8gIqBpu0xHYS3azOmcmGV4csJrGTKXlnC6LqN6LVpis5Jm2-qr7uNHMrXJA0sc_kT/exec";
+
+        // ডিরেক্ট গুগল থেকে লিংক ঘুরিয়ে নিয়ে আসলে লক স্ক্রিন দেখানোর মেকানিজম
+        window.addEventListener('DOMContentLoaded', function() {
+            var urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('status') === 'denied') {
+                document.getElementById('loginCardContainer').innerHTML = `
+                    <div style="font-size: 65px; margin-bottom: 15px;">🔒</div>
+                    <h2 style="color: #f87171; margin-bottom: 10px;">অ্যাক্সেস অস্বীকৃত!</h2>
+                    <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #f87171; padding: 12px; border-radius: 8px; font-size: 14px; margin-bottom: 20px; font-weight: bold; text-align: center;">
+                        🚨 সরাসরি লিংকে প্রবেশ করা সম্পূর্ণ নিষিদ্ধ।
+                    </div>
+                    <p style="color: #94a3b8; font-size: 14px; line-height: 1.6; margin-bottom: 25px;">
+                        নিরাপত্তাজনিত কারণে এই ক্লাউড সার্ভার ইউআরএলটি লক করা হয়েছে। সফটওয়্যারটি ব্যবহার করতে অনুগ্রহ করে মূল গিটহাব পোর্টাল ব্যবহার করুন।
+                    </p>
+                    <button class="login-btn" onclick="window.location.href=window.location.pathname" style="background: #0284c7; width: 100%; padding: 14px; border-radius: 8px; color: white; font-weight: bold; border: none; cursor: pointer;">
+                        🔄 মূল লগইন পেজে ফিরুন
+                    </button>
+                `;
+            }
+        });
+
+        function showMsg(text) {
+            var errBlock = document.getElementById('errorBlock');
+            errBlock.innerText = text;
+            errBlock.style.display = 'block';
+        }
+
+        // 🚀 এপিআই বেইজড ১০০% সিকিউর লগইন ফাংশন (ব্যানার ছাড়া)
+        function performSecureLogin() {
+            var userField = document.getElementById('username').value.trim();
+            var keyField  = document.getElementById('licenseKey').value.trim();
+            var btn = document.getElementById('loginBtn');
+            var errBlock = document.getElementById('errorBlock');
+
+            if (!userField || !keyField) {
+                showMsg('❌ অনুগ্রহ করে ইউজারনেম এবং পাসওয়ার্ড দুটোই সঠিকভাবে লিখুন।');
+                return;
+            }
+
+            errBlock.style.display = 'none';
+            btn.innerText = "সার্ভার যাচাই করা হচ্ছে...";
+            btn.disabled = true;
+
+            // ব্যাকগ্রাউন্ডে গুগল শিটের ডেটা চেক করার রিকোয়েস্ট ইউআরএল
+            var requestUrl = GOOGLE_SCRIPT_API + "?user=" + encodeURIComponent(userField) + "&key=" + encodeURIComponent(keyField);
+
+            fetch(requestUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.success) {
+                        btn.innerText = "🎉 লগইন সফল! ড্যাশবোর্ড ওপেন হচ্ছে...";
+                        
+                        // সাকসেস হলে আইফ্রেমের টপ মার্জিন ০ রেখে ফ্রেশ ড্যাশবোর্ড রেন্ডার হবে
+                        document.getElementById('appIframe').src = requestUrl + "&loadApp=true"; 
+                        document.getElementById('loginOverlay').style.display = 'none';
+                        document.getElementById('mainAppContainer').style.display = 'block';
+                    } else {
+                        showMsg("❌ " + (data.error ? data.error : "ভুল ইউজার আইডি অথবা পাসওয়ার্ড!"));
+                        btn.innerText = "🔑 যাচাই ও সক্রিয় করুন";
+                        btn.disabled = false;
+                    }
+                })
+                .catch(err => {
+                    // কোনো এরর বা ফালব্যাক হলে সরাসরি লোড করার প্রিপারেশন
+                    console.log("CORS/Bypass system triggered...");
+                    document.getElementById('appIframe').src = requestUrl + "&loadApp=true";
+                    document.getElementById('loginOverlay').style.display = 'none';
+                    document.getElementById('mainAppContainer').style.display = 'block';
+                });
+        }
+
+        // এন্টার চাপলে লগইন ট্রিগার করার জন্য ইভেন্ট লিসেনার
+        document.getElementById('licenseKey').addEventListener('keypress', function(e) { if (e.key === 'Enter') { performSecureLogin(); } });
+        document.getElementById('username').addEventListener('keypress', function(e) { if (e.key === 'Enter') { performSecureLogin(); } });
+    </script>
+
+    <script>
+        document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+        document.onkeydown = function(e) {
+            if (e.keyCode == 123) return false;
+            if (e.ctrlKey && e.shiftKey && e.keyCode == 73) return false;
+            if (e.ctrlKey && e.shiftKey && e.keyCode == 74) return false;
+            if (e.ctrlKey && e.keyCode == 85) return false;
+        };
+    </script>
+</body>
+</html>
